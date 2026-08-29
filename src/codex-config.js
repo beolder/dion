@@ -225,6 +225,20 @@ function syncToCodex(codexHome, providers, active, options = {}) {
     }
   }
 
+  // Optionally merge all enabled providers' models into the model catalog so
+  // the desktop picker can list them all.
+  let catalog = null;
+  if (options.mergeCatalog) {
+    const top = resultEntries[0];
+    if (top && top.kind === 'top') {
+      if (!getScalar(top.lines, 'model_catalog_json')) {
+        top.lines = setScalar(top.lines, 'model_catalog_json', path.join(codexHome, 'models.json'));
+      }
+      const catPath = getScalar(top.lines, 'model_catalog_json');
+      if (catPath) catalog = mergeModelCatalog(catPath, providers);
+    }
+  }
+
   const text = serialize(resultEntries, newline);
   const changed = previous !== text;
 
@@ -240,7 +254,8 @@ function syncToCodex(codexHome, providers, active, options = {}) {
     created,
     changed,
     preview: text,
-    backup
+    backup,
+    catalog
   };
 }
 
@@ -361,6 +376,128 @@ function catalogContains(catalogFile, model) {
   }
 }
 
+// A complete-enough template for a model entry. When the existing catalog has a
+// real entry we clone it instead (richer metadata); this is the fallback.
+function defaultModelEntry() {
+  return {
+    slug: '',
+    display_name: '',
+    description: '',
+    context_window: 128000,
+    max_context_window: 128000,
+    effective_context_window_percent: 90,
+    default_reasoning_level: 'medium',
+    default_reasoning_summary: 'none',
+    reasoning_summary_format: 'experimental',
+    supported_reasoning_levels: [
+      { description: 'Disable thinking', effort: 'none' },
+      { description: 'Greater reasoning depth', effort: 'high' }
+    ],
+    support_verbosity: true,
+    default_verbosity: 'medium',
+    apply_patch_tool_type: 'freeform',
+    web_search_tool_type: 'text',
+    input_modalities: ['text'],
+    supports_image_detail_original: false,
+    supports_parallel_tool_calls: true,
+    tool_mode: {},
+    multi_agent_version: 'v2',
+    use_responses_lite: false,
+    include_skills_usage_instructions: true,
+    include_plugin_usage_instructions: true,
+    include_apps_usage_instructions: true,
+    auto_compact_token_limit: { enabled: true, tokens: 80000 },
+    auto_review_model_override: {},
+    comp_hash: '0',
+    truncation_policy: { limit: 10000, mode: 'tokens' },
+    shell_type: 'shell_command',
+    visibility: 'list',
+    supported_in_api: true,
+    support_search_tool: true,
+    supports_reasoning_summaries: true,
+    preserves_reasoning_summaries: false,
+    minimal_client_version: '0.144.0',
+    availability_nux: null,
+    upgrade: null,
+    priority: 1,
+    service_tiers: [],
+    additional_speed_tiers: [],
+    experimental_supported_tools: [],
+    model_messages: {},
+    base_instructions: {}
+  };
+}
+
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Merge every enabled provider's models into the model catalog file referenced
+ * by `model_catalog_json`. Existing entries (which may carry rich metadata) are
+ * preserved; new models get a cloned template with provider-labelled display
+ * names so the desktop picker can list them all.
+ */
+function mergeModelCatalog(catalogFile, providers) {
+  if (!catalogFile) return { ok: false, count: 0, error: '未指定 model_catalog_json' };
+  const enabled = providers.filter((p) => p.enabled !== false && (p.models || []).length);
+  if (enabled.length === 0) return { ok: true, count: 0, path: catalogFile };
+
+  let existing = [];
+  let keepEnvelope = false;
+  let envelope = null;
+  if (fs.existsSync(catalogFile)) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(catalogFile, 'utf8'));
+      if (Array.isArray(doc)) {
+        existing = doc;
+      } else if (Array.isArray(doc.models)) {
+        existing = doc.models;
+        keepEnvelope = true;
+        envelope = { ...doc };
+      }
+    } catch {
+      existing = [];
+    }
+  }
+
+  const template = existing[0] && typeof existing[0] === 'object' ? existing[0] : defaultModelEntry();
+  const bySlug = new Map(existing.map((m) => [m.slug || m.id, m]));
+  let added = 0;
+
+  for (const provider of enabled) {
+    const models = uniqueStrings(provider.models || []);
+    if (provider.defaultModel && !models.includes(provider.defaultModel)) models.push(provider.defaultModel);
+    for (const model of models) {
+      if (bySlug.has(model)) continue;
+      const entry = clone(template);
+      entry.slug = model;
+      entry.id = model;
+      entry.display_name = `${provider.name} · ${model}`;
+      entry.description = `${provider.name} 模型（经 Any Switch 合并）`;
+      entry.supported_in_api = true;
+      entry.visibility = 'list';
+      entry.priority = typeof entry.priority === 'number' ? entry.priority : 1;
+      bySlug.set(model, entry);
+      added++;
+    }
+  }
+
+  const out = [...bySlug.values()];
+  fs.mkdirSync(path.dirname(catalogFile), { recursive: true });
+  if (keepEnvelope && envelope) {
+    envelope.models = out;
+    fs.writeFileSync(catalogFile, JSON.stringify(envelope, null, 2), 'utf8');
+  } else {
+    fs.writeFileSync(catalogFile, JSON.stringify(out, null, 2), 'utf8');
+  }
+  return { ok: true, count: out.length, added, path: catalogFile };
+}
+
+function uniqueStrings(arr) {
+  return [...new Set((arr || []).filter(Boolean))];
+}
+
 module.exports = {
   getCodexHome,
   pathsFor,
@@ -377,5 +514,6 @@ module.exports = {
   timestamp,
   modelCatalogPath,
   catalogContains,
+  mergeModelCatalog,
   MARKER
 };

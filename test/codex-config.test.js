@@ -179,6 +179,41 @@ test('modelCatalogPath and catalogContains resolve models', () => {
   assert.strictEqual(cc.catalogContains(path.join(dir, 'missing.json'), 'glm-4.6'), null);
 });
 
+test('mergeModelCatalog merges enabled providers and preserves existing entries', () => {
+  const dir = makeTmp();
+  const cat = path.join(dir, 'models.json');
+  fs.writeFileSync(cat, JSON.stringify([{ slug: 'deepseek-chat', display_name: 'DeepSeek Chat', context_window: 65536 }]), 'utf8');
+  const providers = [
+    { id: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat', 'deepseek-reasoner'], defaultModel: 'deepseek-chat', enabled: true },
+    { id: 'zhipu', name: '智谱 GLM', models: ['glm-4.6', 'glm-5.2'], defaultModel: 'glm-5.2', enabled: true },
+    { id: 'off', name: 'Off', models: ['off-model'], enabled: false }
+  ];
+  const r = cc.mergeModelCatalog(cat, providers);
+  assert.strictEqual(r.ok, true);
+  const doc = JSON.parse(fs.readFileSync(cat, 'utf8'));
+  const slugs = doc.map((m) => m.slug);
+  for (const s of ['deepseek-chat', 'deepseek-reasoner', 'glm-4.6', 'glm-5.2']) {
+    assert.ok(slugs.includes(s), s + ' present');
+  }
+  assert.ok(!slugs.includes('off-model'), 'disabled provider omitted');
+  assert.strictEqual(doc.find((m) => m.slug === 'deepseek-chat').context_window, 65536, 'existing metadata preserved');
+  assert.ok(doc.find((m) => m.slug === 'glm-5.2').display_name.includes('智谱 GLM'));
+});
+
+test('syncToCodex merges catalog when mergeCatalog option is on', () => {
+  const dir = makeTmp();
+  const cat = path.join(dir, 'models.json');
+  fs.writeFileSync(
+    path.join(dir, 'config.toml'),
+    `model_catalog_json = ${JSON.stringify(cat)}\nmodel = "deepseek-chat"\nmodel_provider = "deepseek"\n`,
+    'utf8'
+  );
+  const res = cc.syncToCodex(dir, providers, { providerId: 'deepseek', model: 'deepseek-chat' }, { mergeCatalog: true });
+  assert.ok(res.catalog && res.catalog.ok, 'catalog merged');
+  const doc = JSON.parse(fs.readFileSync(cat, 'utf8'));
+  assert.ok(doc.length >= 2, 'deepseek + qwen models present');
+});
+
 function readConfig(dir) {
   return fs.readFileSync(path.join(dir, 'config.toml'), 'utf8');
 }

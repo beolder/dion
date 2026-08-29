@@ -74,7 +74,7 @@ const mockState = {
   data: {
     providers: [mockProvider],
     active: { providerId: 'deepseek', model: 'deepseek-chat' },
-    settings: { codexHome: '', forceApiKeyMode: true }
+    settings: { codexHome: '', forceApiKeyMode: true, mergeCatalog: false }
   },
   detected: [],
   activeInConfig: { providerId: 'deepseek', model: 'deepseek-chat' }

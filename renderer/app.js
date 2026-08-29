@@ -488,6 +488,10 @@ function openSettings() {
         <span class="lbl">强制使用 API Key 鉴权（写入 preferred_auth_method / forced_login_method）</span>
         <button class="switch ${s.data.settings.forceApiKeyMode !== false ? 'on' : ''}" id="setForce" type="button"></button>
       </div>
+      <div class="list-row row-between">
+        <span class="lbl">合并模型目录（同步时把已启用所有 Provider 的模型并入 model_catalog_json，让 Codex 模型下拉一次显示全部；路由仍由当前 Provider 决定）</span>
+        <button class="switch ${s.data.settings.mergeCatalog ? 'on' : ''}" id="setMerge" type="button"></button>
+      </div>
       <div class="list-row" style="color:var(--muted);font-size:12px">
         当前目录：<code style="color:var(--text)">${esc(s.codexHome)}</code>
       </div>
@@ -505,6 +509,13 @@ function openSettings() {
       $('#setForce').classList.toggle('on', next);
       const res = await api.setForceApiKey(next);
       applyState(res.state);
+    });
+    $('#setMerge').addEventListener('click', async () => {
+      const next = !$('#setMerge').classList.contains('on');
+      $('#setMerge').classList.toggle('on', next);
+      const res = await api.setMergeCatalog(next);
+      applyState(res.state);
+      toast(next ? '已开启：同步时合并模型目录' : '已关闭合并模型目录', 'success');
     });
   });
 }

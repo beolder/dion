@@ -64,7 +64,8 @@ function syncNow() {
   const providers = state.data.providers;
   const active = state.data.active;
   return codex.syncToCodex(state.codexHome, providers, active, {
-    forceApiKeyMode: state.data.settings.forceApiKeyMode !== false
+    forceApiKeyMode: state.data.settings.forceApiKeyMode !== false,
+    mergeCatalog: state.data.settings.mergeCatalog === true
   });
 }
 
@@ -231,6 +232,13 @@ function registerIpc() {
   ipcMain.handle('settings:setForceApiKey', (_e, val) => {
     const state = computeState();
     state.data.settings.forceApiKeyMode = val !== false;
+    store.save(dataDir, state.data);
+    return { ok: true, state: computeState() };
+  });
+
+  ipcMain.handle('settings:setMergeCatalog', (_e, val) => {
+    const state = computeState();
+    state.data.settings.mergeCatalog = val === true;
     store.save(dataDir, state.data);
     return { ok: true, state: computeState() };
   });

@@ -39,6 +39,7 @@ Any Switch 把这些都封装成一个图形界面，只做“外科手术式”
 - **导入已有配置**：检测 `config.toml` 里已有的 Provider，一键导入。
 - **鉴权方式**：支持把 Key 直接写入 Provider（`experimental_bearer_token`），或引用环境变量（`env_key`）。
 - **强制 API Key 模式**：自动写入 `preferred_auth_method = "apikey"` 与 `forced_login_method = "api"`。
+- **合并模型目录**（可选）：同步时把已启用所有 Provider 的模型合并进 `model_catalog_json`，让 Codex 模型下拉一次显示全部。
 
 ## 环境要求
 
@@ -114,6 +115,12 @@ gh release create v1.0.0 --title "v1.0.0" --generate-notes release/*
 4. 点击“保存”。“设为当前”会用所选模型更新 Codex 配置。
 5. 同步按钮会把所有启用的 Provider 一并写入 `config.toml`。
 6. 在 Codex 里，可用 `/model <模型ID>` 在已配置的 Provider 间即时切换。
+
+## 合并模型目录（让下拉一次看全部）
+
+Codex 的模型下拉框读的是 `model_catalog_json` 指向的那份目录（通常是 `~/.codex/models.json`），而这份目录只装“当前 Provider”的模型，所以默认只看到一家。在 Any Switch 的 **设置** 里打开 **“合并模型目录”** 后再同步，它会把所有已启用 Provider 的模型都合并进 `~/.codex/models.json`，下拉即可一次看到 DeepSeek、智谱等全部模型。
+
+> 注意：`model_provider` 决定请求真的发往哪，模型下拉只负责“显示”。所以合并后，**要真正使用某家的模型，仍需先在 Any Switch 里对它点“设为当前”**（或确认当前 Provider 就是那家），否则选中的模型会发到当前 Provider 的地址上。若想要“一个下拉里点谁就路由到谁”，需要一个聚合中继（见下）。
 
 ## wire_api：chat 还是 responses
 

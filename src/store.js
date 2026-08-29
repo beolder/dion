@@ -7,7 +7,7 @@ function defaultData() {
   return {
     providers: [],
     active: { providerId: null, model: null },
-    settings: { codexHome: '', forceApiKeyMode: true }
+    settings: { codexHome: '', forceApiKeyMode: true, mergeCatalog: false }
   };
 }
 
