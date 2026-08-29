@@ -7,7 +7,13 @@ function defaultData() {
   return {
     providers: [],
     active: { providerId: null, model: null },
-    settings: { codexHome: '', forceApiKeyMode: true, mergeCatalog: false }
+    settings: {
+      codexHome: '',
+      forceApiKeyMode: true,
+      mergeCatalog: false,
+      routerMode: false,
+      routerPort: 8788
+    }
   };
 }
 

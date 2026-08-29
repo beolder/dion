@@ -214,6 +214,39 @@ test('syncToCodex merges catalog when mergeCatalog option is on', () => {
   assert.ok(doc.length >= 2, 'deepseek + qwen models present');
 });
 
+test('syncToCodex uses catalogProviders for merge even when config only has router', () => {
+  const dir = makeTmp();
+  const cat = path.join(dir, 'models.json');
+  fs.writeFileSync(
+    path.join(dir, 'config.toml'),
+    `model_catalog_json = ${JSON.stringify(cat)}\nmodel = "deepseek-chat"\nmodel_provider = "any-switch"\n`,
+    'utf8'
+  );
+  const routerProv = {
+    id: 'any-switch',
+    name: 'Router',
+    baseUrl: 'http://127.0.0.1:9/v1',
+    wireApi: 'responses',
+    authType: 'bearer',
+    apiKey: 'any-switch',
+    models: ['deepseek-chat'],
+    defaultModel: 'deepseek-chat',
+    enabled: true
+  };
+  const real = [
+    { id: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat'], defaultModel: 'deepseek-chat', enabled: true }
+  ];
+  const res = cc.syncToCodex(dir, [routerProv], { providerId: 'any-switch', model: 'deepseek-chat' }, {
+    mergeCatalog: true,
+    catalogProviders: real
+  });
+  assert.ok(res.catalog && res.catalog.ok);
+  const doc = JSON.parse(fs.readFileSync(cat, 'utf8'));
+  const entry = doc.find((m) => m.slug === 'deepseek-chat');
+  assert.ok(entry, 'deepseek-chat merged');
+  assert.ok(entry.display_name.includes('DeepSeek'), 'labeled with real provider, not Router');
+});
+
 function readConfig(dir) {
   return fs.readFileSync(path.join(dir, 'config.toml'), 'utf8');
 }

@@ -8,8 +8,12 @@ const codex = require('./src/codex-config');
 const store = require('./src/store');
 const { presets, fromPreset, findPreset } = require('./src/presets');
 const health = require('./src/health');
+const { createRouterServer } = require('./src/router');
 
 const dataDir = process.env.ANY_SWITCH_HOME || app.getPath('userData');
+
+const DEFAULt_ROUTER_PORT = 8788;
+let router = null;
 
 let mainWindow = null;
 
@@ -55,18 +59,109 @@ function computeState() {
     catalogPath,
     data,
     detected,
-    activeInConfig
+    activeInConfig,
+    routerStatus: {
+      running: !!router,
+      port: router ? router.port() : (data.settings.routerPort || DEFAULt_ROUTER_PORT)
+    }
   };
 }
 
-function syncNow() {
+function isRouterMode(override) {
+  return override !== undefined ? !!override : store.load(dataDir).settings.routerMode === true;
+}
+
+function routerProvider(data, port, model) {
+  const seen = new Set();
+  const models = [];
+  for (const p of data.providers) {
+    if (p.enabled === false) continue;
+    for (const m of p.models || []) {
+      if (!seen.has(m)) {
+        seen.add(m);
+        models.push(m);
+      }
+    }
+    if (p.defaultModel && !seen.has(p.defaultModel)) {
+      seen.add(p.defaultModel);
+      models.push(p.defaultModel);
+    }
+  }
+  const modelStr = model || data.active.model || models[0] || '';
+  return {
+    id: 'any-switch',
+    name: 'Any Switch Router',
+    baseUrl: `http://127.0.0.1:${port}/v1`,
+    wireApi: 'responses',
+    authType: 'bearer',
+    apiKey: 'any-switch',
+    envKey: '',
+    models,
+    defaultModel: modelStr,
+    color: '#0ea5e9',
+    note: '本地多路由：Codex 点哪个模型，就把请求转发到对应 Provider',
+    builtin: false,
+    enabled: true
+  };
+}
+
+function effectiveProviders(state, routerMode) {
+  if (!routerMode) return state.data.providers;
+  // Only the router provider is written to config in router mode. Real providers
+  // are used by the router (from the store) and by the catalog merge, so chat-only
+  // providers never end up in config.toml (which the desktop app rejects).
+  return [routerProvider(state.data, state.data.settings.routerPort || DEFAULt_ROUTER_PORT)];
+}
+
+function effectiveActive(state, routerMode) {
+  if (!routerMode) return state.data.active;
+  let model = state.data.active.model || '';
+  if (!model) {
+    for (const p of state.data.providers) {
+      if (p.enabled !== false) {
+        model = p.defaultModel || (p.models && p.models[0]) || '';
+        if (model) break;
+      }
+    }
+  }
+  return {
+    providerId: 'any-switch',
+    model
+  };
+}
+
+function syncNow(opts = {}) {
   const state = computeState();
-  const providers = state.data.providers;
-  const active = state.data.active;
+  const routerMode = isRouterMode(opts.routerMode);
+  const providers = effectiveProviders(state, routerMode);
+  const active = effectiveActive(state, routerMode);
   return codex.syncToCodex(state.codexHome, providers, active, {
     forceApiKeyMode: state.data.settings.forceApiKeyMode !== false,
-    mergeCatalog: state.data.settings.mergeCatalog === true
+    mergeCatalog: state.data.settings.mergeCatalog === true || routerMode,
+    catalogProviders: state.data.providers
   });
+}
+
+async function ensureRouter() {
+  if (router) return router;
+  const data = store.load(dataDir);
+  const port = data.settings.routerPort || DEFAULt_ROUTER_PORT;
+  const created = createRouterServer({
+    getProviders: () => store.load(dataDir).providers
+  });
+  const res = await created.listen(port);
+  if (!res.ok) {
+    return { error: res.error };
+  }
+  router = created;
+  return router;
+}
+
+async function stopRouter() {
+  if (!router) return { ok: true };
+  await router.close();
+  router = null;
+  return { ok: true };
 }
 
 function registerIpc() {
@@ -243,6 +338,37 @@ function registerIpc() {
     return { ok: true, state: computeState() };
   });
 
+  ipcMain.handle('settings:setRouterMode', async (_e, val) => {
+    const want = val === true;
+    const state = computeState();
+    const data = state.data;
+    const model = data.active.model || '';
+    if (!want) {
+      const owning = data.providers.find(
+        (p) => p.enabled !== false && ((p.models || []).includes(model) || p.defaultModel === model)
+      );
+      const fb = owning || data.providers.find((p) => p.enabled !== false) || null;
+      if (fb) {
+        data.active = { providerId: fb.id, model: model || fb.defaultModel || (fb.models && fb.models[0]) || '' };
+      }
+    }
+    data.settings.routerMode = want;
+    store.save(dataDir, data);
+    if (want) {
+      const r = await ensureRouter();
+      if (r && r.error) return { ok: false, error: r.error, state: computeState() };
+    } else {
+      await stopRouter();
+    }
+    let sync = null;
+    try {
+      sync = syncNow();
+    } catch (e) {
+      sync = { ok: false, error: e.message };
+    }
+    return { ok: true, state: computeState(), sync };
+  });
+
   ipcMain.handle('app:version', () => ({
     ok: true,
     app: app.getVersion(),
@@ -282,6 +408,17 @@ function createWindow() {
 app.whenReady().then(() => {
   registerIpc();
   createWindow();
+  if (store.load(dataDir).settings.routerMode) {
+    ensureRouter().then((r) => {
+      if (r && !r.error) {
+        try {
+          syncNow();
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -289,4 +426,15 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', async () => {
+  if (router) {
+    try {
+      syncNow({ routerMode: false });
+    } catch {
+      /* ignore */
+    }
+    await stopRouter();
+  }
 });

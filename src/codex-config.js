@@ -235,7 +235,10 @@ function syncToCodex(codexHome, providers, active, options = {}) {
         top.lines = setScalar(top.lines, 'model_catalog_json', path.join(codexHome, 'models.json'));
       }
       const catPath = getScalar(top.lines, 'model_catalog_json');
-      if (catPath) catalog = mergeModelCatalog(catPath, providers);
+      const mergeSrc = options.catalogProviders && options.catalogProviders.length
+        ? options.catalogProviders
+        : providers;
+      if (catPath) catalog = mergeModelCatalog(catPath, mergeSrc);
     }
   }
 

@@ -122,6 +122,18 @@ Codex 的模型下拉框读的是 `model_catalog_json` 指向的那份目录（�
 
 > 注意：`model_provider` 决定请求真的发往哪，模型下拉只负责“显示”。所以合并后，**要真正使用某家的模型，仍需先在 Any Switch 里对它点“设为当前”**（或确认当前 Provider 就是那家），否则选中的模型会发到当前 Provider 的地址上。若想要“一个下拉里点谁就路由到谁”，需要一个聚合中继（见下）。
 
+## 路由模式（点谁就路由到谁）
+
+这是“多 Provider 同时可用”的完整方案。开启 **设置 → 路由模式** 后，Any Switch 会在本地启动一个小路由（`127.0.0.1:8788`），并把 Codex 的 `model_provider` 指向这个本地路由，`model_catalog_json` 合并所有已启用 Provider 的模型。于是：
+
+- Codex 模型下拉一次列出 DeepSeek、智谱等全部模型；
+- 你**点哪个模型，路由就把请求发给对应的真实 Provider**（用各自的 `/responses` 地址和 Key）；
+- 无需预先“设为当前”。
+
+> 约束：路由需要 Any Switch 保持运行。关闭 App 会自动停止路由，并把 `config.toml` 回退到当前 Provider 直接连接，因此 Codex 不会因为路由停了而连不上。
+
+只支持 `wire_api = "responses"` 的 Provider（DeepSeek、智谱/月之暗面 z.ai 等都支持）；`chat` 型 Provider 会在路由里报“仅支持 chat 接口”。
+
 ## wire_api：chat 还是 responses
 
 - `chat`：走 OpenAI 兼容的 `/chat/completions`，绝大多数国内第三方都支持。

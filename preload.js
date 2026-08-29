@@ -20,5 +20,6 @@ contextBridge.exposeInMainWorld('anySwitch', {
   setCodexHome: (path) => ipcRenderer.invoke('settings:setCodexHome', path),
   setForceApiKey: (val) => ipcRenderer.invoke('settings:setForceApiKey', val),
   setMergeCatalog: (val) => ipcRenderer.invoke('settings:setMergeCatalog', val),
+  setRouterMode: (val) => ipcRenderer.invoke('settings:setRouterMode', val),
   version: () => ipcRenderer.invoke('app:version')
 });

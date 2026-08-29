@@ -74,10 +74,11 @@ const mockState = {
   data: {
     providers: [mockProvider],
     active: { providerId: 'deepseek', model: 'deepseek-chat' },
-    settings: { codexHome: '', forceApiKeyMode: true, mergeCatalog: false }
+    settings: { codexHome: '', forceApiKeyMode: true, mergeCatalog: false, routerMode: false, routerPort: 8788 }
   },
   detected: [],
-  activeInConfig: { providerId: 'deepseek', model: 'deepseek-chat' }
+  activeInConfig: { providerId: 'deepseek', model: 'deepseek-chat' },
+  routerStatus: { running: false, port: 8788 }
 };
 
 global.window = {
@@ -97,7 +98,9 @@ global.window = {
     restoreBackup: async () => ({ ok: true, state: mockState }),
     openConfigDir: async () => ({ ok: true }),
     setCodexHome: async () => ({ ok: true, state: mockState }),
-    setForceApiKey: async () => ({ ok: true, state: mockState })
+    setForceApiKey: async () => ({ ok: true, state: mockState }),
+    setMergeCatalog: async () => ({ ok: true, state: mockState }),
+    setRouterMode: async () => ({ ok: true, state: mockState, sync: { changed: true } })
   }
 };
 global.document = doc;

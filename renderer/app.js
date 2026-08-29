@@ -171,6 +171,12 @@ function renderActive() {
           <span class="status-dot" style="background:var(--warning)"></span>
           <span class="warn">该模型不在当前模型目录（model_catalog_json）中。请重启 Codex 或在其模型选择器里刷新，Codex 会从该 Provider 重新获取模型。</span>
         </div>`
+      : ''}
+    ${S.state.data.settings.routerMode
+      ? `<div class="status-line" style="border-color:rgba(52,211,153,0.4)">
+          <span class="status-dot" style="background:var(--success)"></span>
+          <span class="ok">本地路由已开启：模型下拉点谁就路由到谁（127.0.0.1:${esc(S.state.routerStatus.port)}）。关闭 App 会停止路由并回退到当前 Provider 直连。</span>
+        </div>`
       : ''}`;
   $('#btnApplyActive').addEventListener('click', async () => {
     const model = $('#activeModel').value;
@@ -492,6 +498,17 @@ function openSettings() {
         <span class="lbl">合并模型目录（同步时把已启用所有 Provider 的模型并入 model_catalog_json，让 Codex 模型下拉一次显示全部；路由仍由当前 Provider 决定）</span>
         <button class="switch ${s.data.settings.mergeCatalog ? 'on' : ''}" id="setMerge" type="button"></button>
       </div>
+      <div class="list-row row-between">
+        <span class="lbl">路由模式（Codex 模型下拉“点谁就路由到谁”；需保持 Any Switch 运行）</span>
+        <button class="switch ${s.data.settings.routerMode ? 'on' : ''}" id="setRouter" type="button"></button>
+      </div>
+      <div class="list-row" style="color:var(--muted);font-size:12px">
+        路由状态：
+        <span class="${s.routerStatus && s.routerStatus.running ? 'ok' : 'warn'}">
+          ${s.routerStatus && s.routerStatus.running ? `运行中 · 127.0.0.1:${s.routerStatus.port}` : '未运行'}
+        </span>
+        ${s.routerStatus && s.routerStatus.running ? '（关闭 App 会停止路由，Codex 将回退到当前 Provider 直连）' : ''}
+      </div>
       <div class="list-row" style="color:var(--muted);font-size:12px">
         当前目录：<code style="color:var(--text)">${esc(s.codexHome)}</code>
       </div>
@@ -516,6 +533,18 @@ function openSettings() {
       const res = await api.setMergeCatalog(next);
       applyState(res.state);
       toast(next ? '已开启：同步时合并模型目录' : '已关闭合并模型目录', 'success');
+    });
+    $('#setRouter').addEventListener('click', async () => {
+      const next = !$('#setRouter').classList.contains('on');
+      $('#setRouter').classList.toggle('on', next);
+      const res = await api.setRouterMode(next);
+      applyState(res.state);
+      if (!res.ok) {
+        $('#setRouter').classList.toggle('on', !next);
+        toast(res.error || '路由启动失败', 'error');
+        return;
+      }
+      toast(next ? '已开启路由模式，请保持 Any Switch 运行' : '已关闭路由模式', 'success');
     });
   });
 }
