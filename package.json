@@ -1,0 +1,64 @@
+{
+  "name": "any-switch",
+  "productName": "Any Switch",
+  "version": "1.0.0",
+  "description": "Multi-provider switcher for Codex — manage many third-party OpenAI-compatible APIs and switch between them on Windows & macOS.",
+  "main": "main.js",
+  "author": "Any Switch",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.anyswitch.app",
+    "productName": "Any Switch",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Any-Switch-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Any-Switch-${version}-${arch}.${ext}",
+      "category": "public.app-category.developer-tools"
+    }
+  }
+}
