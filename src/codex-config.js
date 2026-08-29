@@ -494,7 +494,35 @@ function mergeModelCatalog(catalogFile, providers) {
   } else {
     fs.writeFileSync(catalogFile, JSON.stringify(out, null, 2), 'utf8');
   }
-  return { ok: true, count: out.length, added, path: catalogFile };
+
+  // The desktop app also caches the picker catalog in models_cache.json. Merge
+  // our models there too (keeping existing entries) and bump etag so Codex
+  // re-reads it instead of serving a stale candidate list.
+  let cacheFile = null;
+  const candidate = path.join(path.dirname(catalogFile), 'models_cache.json');
+  if (fs.existsSync(candidate)) {
+    try {
+      const doc = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      const cacheModels = Array.isArray(doc.models) ? doc.models : [];
+      const cacheBySlug = new Map(cacheModels.map((m) => [m.slug || m.id, m]));
+      for (const entry of out) {
+        const key = entry.slug || entry.id;
+        if (key && !cacheBySlug.has(key)) cacheBySlug.set(key, clone(entry));
+      }
+      const newDoc = {
+        ...doc,
+        models: [...cacheBySlug.values()],
+        fetched_at: new Date().toISOString(),
+        etag: String(Date.now())
+      };
+      fs.writeFileSync(candidate, JSON.stringify(newDoc, null, 2), 'utf8');
+      cacheFile = candidate;
+    } catch {
+      /* ignore cache write errors */
+    }
+  }
+
+  return { ok: true, count: out.length, added, path: catalogFile, cacheFile };
 }
 
 function uniqueStrings(arr) {

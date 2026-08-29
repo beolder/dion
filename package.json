@@ -1,7 +1,7 @@
 {
   "name": "any-switch",
   "productName": "Any Switch",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Multi-provider switcher for Codex — manage many third-party OpenAI-compatible APIs and switch between them on Windows & macOS.",
   "main": "main.js",
   "author": "Any Switch",

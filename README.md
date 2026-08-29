@@ -130,6 +130,8 @@ Codex 的模型下拉框读的是 `model_catalog_json` 指向的那份目录（�
 - 你**点哪个模型，路由就把请求发给对应的真实 Provider**（用各自的 `/responses` 地址和 Key）；
 - 无需预先“设为当前”。
 
+开启后同步时会**同时刷新 `models.json` 和 `models_cache.json`**（`model_catalog_json` 会合并所有模型的目录），避免桌面端仍用旧的候选缓存、只显示当前那一家。
+
 > 约束：路由需要 Any Switch 保持运行。关闭 App 会自动停止路由，并把 `config.toml` 回退到当前 Provider 直接连接，因此 Codex 不会因为路由停了而连不上。
 
 只支持 `wire_api = "responses"` 的 Provider（DeepSeek、智谱/月之暗面 z.ai 等都支持）；`chat` 型 Provider 会在路由里报“仅支持 chat 接口”。

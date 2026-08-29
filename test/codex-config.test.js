@@ -183,6 +183,12 @@ test('mergeModelCatalog merges enabled providers and preserves existing entries'
   const dir = makeTmp();
   const cat = path.join(dir, 'models.json');
   fs.writeFileSync(cat, JSON.stringify([{ slug: 'deepseek-chat', display_name: 'DeepSeek Chat', context_window: 65536 }]), 'utf8');
+  fs.writeFileSync(path.join(dir, 'models_cache.json'), JSON.stringify({
+    fetched_at: '2026-01-01T00:00:00.000Z',
+    etag: 'old',
+    client_version: 'x',
+    models: [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }]
+  }), 'utf8');
   const providers = [
     { id: 'deepseek', name: 'DeepSeek', models: ['deepseek-chat', 'deepseek-reasoner'], defaultModel: 'deepseek-chat', enabled: true },
     { id: 'zhipu', name: '智谱 GLM', models: ['glm-4.6', 'glm-5.2'], defaultModel: 'glm-5.2', enabled: true },
@@ -198,6 +204,13 @@ test('mergeModelCatalog merges enabled providers and preserves existing entries'
   assert.ok(!slugs.includes('off-model'), 'disabled provider omitted');
   assert.strictEqual(doc.find((m) => m.slug === 'deepseek-chat').context_window, 65536, 'existing metadata preserved');
   assert.ok(doc.find((m) => m.slug === 'glm-5.2').display_name.includes('智谱 GLM'));
+  // cache should also be refreshed and keep built-in models
+  assert.ok(r.cacheFile, 'cache file path returned');
+  const cache = JSON.parse(fs.readFileSync(path.join(dir, 'models_cache.json'), 'utf8'));
+  const cacheSlugs = cache.models.map((m) => m.slug);
+  assert.ok(cacheSlugs.includes('gpt-5.5'), 'built-in kept');
+  assert.ok(cacheSlugs.includes('deepseek-chat'), 'third-party added to cache');
+  assert.notStrictEqual(cache.etag, 'old', 'etag bumped so Codex refreshes');
 });
 
 test('syncToCodex merges catalog when mergeCatalog option is on', () => {
