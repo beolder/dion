@@ -78,6 +78,34 @@ npm run dist:win
 npm run dist:mac
 ```
 
+## 发布到 GitHub Releases
+
+仓库里已附带 `.github/workflows/release.yml`。它会：**每当推送一个 `v*` 标签时，自动在 Windows 与 macOS 两个 runner 上构建安装包，并把产物上传到对应的 GitHub Release。** 也就是你不需要同时有 Windows 和 Mac 两套环境。
+
+发布步骤：
+
+```bash
+# 1) 先把带 release 工作流的代码推到远程
+git add .
+git commit -m "ci: add release workflow"
+git push origin main
+
+# 2) 打个版本标签并推送，Actions 会自动构建 + 上传
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+推送后到 <https://github.com/beolder/dion/actions> 可看到构建进度；完成后到 <https://github.com/beolder/dion/releases> 即可看到 `Any-Switch-Setup-1.0.0.exe`、`Any-Switch-1.0.0-x64.dmg`、`Any-Switch-1.0.0-arm64.dmg` 等附件。
+
+如果想手动上传（例如本机已构建好产物），也可以用 GitHub 网页或 `gh`：
+
+```bash
+# 安装 GitHub CLI 后（Windows: winget install GitHub.cli）
+gh release create v1.0.0 --title "v1.0.0" --generate-notes release/*
+
+# 或者在浏览器打开 /releases -> Draft a new release -> 填版本号 -> 拖入 release/ 里的文件 -> Publish
+```
+
 ## 使用流程
 
 1. 打开 App，点击“新建”，选一个预设，或直接自定义。
